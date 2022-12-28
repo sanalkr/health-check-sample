@@ -8,10 +8,13 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+builder.Services.Configure<ConnectionStrings>(builder.Configuration.GetSection("ConnectionStrings"));
 builder.Services.Configure<ApiSettingOptions>(builder.Configuration.GetSection(ApiSettingOptions.Name));
 
 builder.Services.AddHealthChecks()
-    .AddCheck<ApplicationHealthCheck>("ApplicationHealthCheck");
+    .AddCheck<ApplicationHealthCheck>("ApplicationHealthCheck")
+    .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    
 
 var app = builder.Build();
 

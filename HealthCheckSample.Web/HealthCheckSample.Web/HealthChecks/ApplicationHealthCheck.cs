@@ -17,23 +17,22 @@ namespace HealthCheckSample.Web.HealthChecks
         public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
         {
 
-            HealthCheckResult healthCheckResult = await CheckApiHealthAsyc(context, cancellationToken);
+            HealthCheckResult healthCheckResult = await CheckApiHealthAsync(context, cancellationToken);
 
             return healthCheckResult;
         }
 
-        private async Task<HealthCheckResult> CheckApiHealthAsyc(HealthCheckContext context, CancellationToken cancellationToken)
+        private async Task<HealthCheckResult> CheckApiHealthAsync(HealthCheckContext context, CancellationToken cancellationToken)
         {
             HttpClient client = new HttpClient();
             client.BaseAddress = new Uri(_apiSettingOptions.Value.BaseUrl);
 
-            using HttpResponseMessage responseMessage =  await client.GetAsync(_apiSettingOptions.Value.HealthEndpoint);
+            using HttpResponseMessage responseMessage = await client.GetAsync(_apiSettingOptions.Value.HealthEndpoint);
             responseMessage.EnsureSuccessStatusCode();
 
             var responseBody = await responseMessage.Content.ReadAsStringAsync();
 
-            context.Registration.FailureStatus
             return responseBody.ToHealthCheckResult();
-        }      
+        }
     }
 }
