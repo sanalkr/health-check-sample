@@ -1,5 +1,7 @@
 
 
+using Azure.Identity;
+using HealthChecks.UI.Client;
 using HealthCheckSample.Web.HealthChecks;
 using HealthCheckSample.Web.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -18,9 +20,42 @@ builder.Services.AddControllersWithViews();
 builder.Services.Configure<ConnectionStrings>(builder.Configuration.GetSection("ConnectionStrings"));
 builder.Services.Configure<ApiSettingOptions>(builder.Configuration.GetSection(ApiSettingOptions.Name));
 
+string containerName = builder.Configuration.GetValue<string>("StorageContainerName");
+string queueName = builder.Configuration.GetValue<string>("SBQueueName");
+string keyVaultUri = builder.Configuration.GetValue<string>("AzureKeyVaultUri");
+string azureTag = "azure";
+
 builder.Services.AddHealthChecks()
     .AddCheck<ApplicationHealthCheck>("ApplicationHealthCheck", tags: new string[] { "simple" })
-    .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"), name: "Sqlserver-check", tags: new string[] { azureTag })
+    .AddAzureBlobStorage(
+        builder.Configuration.GetValue<string>("StorageAccountConnection"),
+        containerName,
+        name: "Azure Storage Blob-check",
+        tags: new string[] { azureTag })
+    .AddAzureServiceBusQueue(
+        builder.Configuration.GetValue<string>("ServiceBusConnection"),
+        queueName,
+        name: "ServiceBusQueue-check",
+        tags: new string[] { azureTag })
+    .AddCosmosDb(
+        builder.Configuration.GetConnectionString("CosmosDBConnection"),
+        name: "CosmosDB-check",
+        tags: new string[] { azureTag })
+    .AddAzureKeyVault(
+        new Uri(keyVaultUri),
+        new DefaultAzureCredential(),
+        ops => {
+            ops.AddSecret("test-secret");
+        },
+        name: "AzureKeyVault-check",
+        tags: new string[] { azureTag }); ;
+
+builder.Services.AddHealthChecksUI(setting =>
+{
+    setting.AddHealthCheckEndpoint("Default", "/health");
+})
+    .AddInMemoryStorage();
 
 builder.Services.Configure<HealthCheckPublisherOptions>(ops =>
 {
@@ -71,16 +106,14 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-app.MapHealthChecks("/health/all", new HealthCheckOptions
+app.MapHealthChecks("/health", new HealthCheckOptions
 {
-    ResultStatusCodes = {
-        [HealthStatus.Healthy] = StatusCodes.Status200OK,
-        [HealthStatus.Degraded] = StatusCodes.Status200OK,
-        [HealthStatus.Unhealthy] = StatusCodes.Status500InternalServerError
-    }
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
 })
-    .RequireHost("*:7061");
-    //.RequireAuthorization();
+    .RequireHost("*:7061", "*:443");
+//.RequireAuthorization();
+
+app.MapHealthChecksUI(); //default UI - healthcheck-ui
 
 app.MapHealthChecks("/hc", new HealthCheckOptions
 {
